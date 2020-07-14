@@ -9,15 +9,15 @@ import (
   "net/http"
 	"github.com/antchfx/xmlquery"
   "html/template"
+	// "text/template"
   "io/ioutil"
 	"github.com/gorilla/mux"
-
 	"crypto/rand"
 	"golang.org/x/crypto/nacl/secretbox"
 	"io"
 	"log"
 	"flag"
-
+  "time"
 )
 
 
@@ -90,31 +90,42 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
     iPage.Execute(w, nil)
 }
 
-
-
 func coinsHandler(w http.ResponseWriter, r *http.Request) {
 		tpl := template.Must(template.ParseFiles("crypto.json"))
 		w.Header().Set("Content-Type", "application/json")
 		tpl.Execute(w, nil)
 	}
 
-	func coinsHandler2(w http.ResponseWriter, r *http.Request) {
-			tpl := template.Must(template.ParseFiles("encrypto.json"))
-			w.Header().Set("Content-Type", "application/json")
-			tpl.Execute(w, nil)
-		}
-
-		func coinsHandler3(w http.ResponseWriter, r *http.Request) {
-				tpl := template.Must(template.ParseFiles("decrypto.json"))
+func coinsHandler3(w http.ResponseWriter, r *http.Request) {
+				tpl3 := template.Must(template.ParseFiles("decrypto.json"))
 				w.Header().Set("Content-Type", "application/json")
-				tpl.Execute(w, nil)
+				tpl3.Execute(w, nil)
 			}
 
+func getCourses() {
+				for{
+				resp, errR := http.Get("https://test.cryptohonest.ru/request-exportxml.xml")
+			    if errR != nil{
+			         fmt.Println(errR)
+			         }
+			  //кэширование в файл
+			    xmlFILE, errX := os.Create("crypto.xml")
+			    if errX != nil {
+			    		fmt.Println("Error to create file: ", errX)
+			    	}
+			    defer xmlFILE.Close()
+			    resp.Write(xmlFILE)
+					time.Sleep(10*time.Second)
+				}
+			}
 
 func main() {
 
   valuesToInput := []DynamicValues{}
 	contentWithValues := Contents{valuesToInput}
+
+
+	go getCourses()
 
   resp, errR := http.Get("https://test.cryptohonest.ru/request-exportxml.xml")
     if errR != nil{
@@ -192,7 +203,7 @@ func main() {
     jsonData, _ := json.Marshal(dataS)
 
     dataR := []byte(jsonData)
-    xmlFILEx, errXs := os.Create("cryptoFormat.json")
+    xmlFILEx, errXs := os.Create("cryptoFormat.txt")
     if errXs != nil {
     		fmt.Println("Erorr to create file: ", errXs)
     	}
@@ -223,34 +234,35 @@ func main() {
 	copy(out, nonce[:])
 	out = secretbox.Seal(out, message, nonce, naclKey)
 
-	err = ioutil.WriteFile("encrypto.json", out, 0644)
+	err = ioutil.WriteFile("encoding.json", out, 0777)
 	if err != nil {
-		log.Fatalln("Error while writing encrypto.xml: ", err)
+		log.Fatalln("Error while writing encrypto.json: ", err)
 	}
-	fmt.Printf("The encrypto.json is: '%s'\n", out)
+
+	fmt.Printf("The encoding.json is: '%s'\n", out)
+
 
 	// dataRi := []byte(out)
-	// xmlFILExi, errXsi := os.Create("cryptoCourses.json")
+	// xmlFILExi, errXsi := os.Create("cryptoCourses.txt")
 	// if errXsi != nil {
 	// 		fmt.Println("Erorr to create file: ", errXs)
 	// 	}
 	// 		xmlFILExi.Write(dataRi)
 	// defer xmlFILExi.Close()
-
-
-	fmt.Printf("Message encrypted succesfully. Total size is %d bytes,"+
-		" of which %d bytes is the message, "+
-		"%d bytes is the nonce and %d bytes is the overhead.\n",
-		len(out), len(message), nonceSize, secretbox.Overhead)
-	fmt.Printf("The encryption key is: '%s'\n", naclKey[:])
-
-	fmt.Printf("The nonce is: '%v'\n", nonce[:])
+	//
+	//
+	// fmt.Printf("Message encrypted succesfully. Total size is %d bytes,"+
+	// 	" of which %d bytes is the message, "+
+	// 	"%d bytes is the nonce and %d bytes is the overhead.\n",
+	// 	len(out), len(message), nonceSize, secretbox.Overhead)
+	// fmt.Printf("The encryption key is: '%s'\n", naclKey[:])
+	// fmt.Printf("The nonce is: '%v'\n", nonce[:])
 
 
 
 //deco
 
-	in, err := ioutil.ReadFile("encrypto.json")
+	in, err := ioutil.ReadFile("encoding.json")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -259,9 +271,9 @@ func main() {
 
 	message, ok := secretbox.Open(nil, in[nonceSize:], nonce, naclKey)
 	if ok {
-		err = ioutil.WriteFile("decrypto.json", message, 0644)
+		err = ioutil.WriteFile("decrypto.json", message, 0777)
 		if err != nil {
-			log.Fatalln("Error while writing decrypto.xml: ", err)
+			log.Fatalln("Error while writing decrypto.json: ", err)
 		}
 
 		fmt.Println("Message decrypted successfully.")
@@ -272,17 +284,19 @@ func main() {
 		log.Fatalln("Could not decrypt the message.")
 	}
 
-
-
 		//создание локального сервера
 		r := mux.NewRouter()
 		r.HandleFunc("/courses", coinsHandler).Methods("GET")
 		r.HandleFunc("/encoding", coinsHandler2).Methods("GET")
-		r.HandleFunc("/decoding", coinsHandler2).Methods("GET")
+		r.HandleFunc("/decoding", coinsHandler3).Methods("GET")
 		r.HandleFunc("/", indexHandler)
     http.Handle("/", r)
 		http.ListenAndServe(":8181", nil)
 
-
-
 }
+
+func coinsHandler2(w http.ResponseWriter, r *http.Request) {
+		tpl2 := template.Must(template.ParseFiles("encoding.json"))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tpl2)
+	}
